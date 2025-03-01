@@ -12,7 +12,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
 	_ "github.com/lib/pq" // PostgreSQL driver
 )
 
@@ -33,18 +32,17 @@ func main() {
 	}
 	log.Println("Successfully connected to the database")
 
-	// Initialize Fiber app
-	app := fiber.New()
-
-	// Define a simple route
-	app.Get("/", func(c *fiber.Ctx) error {
-		return c.SendString("Hello, World!")
+	// Initialize the API router (simplified for this example)
+	router := http.NewServeMux()
+	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Hello, World!"))
 	})
 
 	// Create HTTP server with timeouts
 	server := &http.Server{
-		Addr: ":" + strconv.Itoa(cfg.HTTPPort),
-		// Handler:      app,
+		Addr:         ":" + strconv.Itoa(cfg.HTTPPort),
+		Handler:      router,
 		ReadTimeout:  cfg.ReadTimeout,
 		WriteTimeout: cfg.WriteTimeout,
 	}
