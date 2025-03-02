@@ -1,23 +1,37 @@
 package main
 
 import (
+	"ad-tracking-system/internal/api"
 	"ad-tracking-system/internal/config"
+	"ad-tracking-system/internal/domain/services"
+	"ad-tracking-system/internal/repository"
 	"context"
 	"database/sql"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
-	"strconv"
+	"strconv" // Add this import
 	"syscall"
 	"time"
 
-	_ "github.com/lib/pq" // PostgreSQL driver
+	_ "github.com/lib/pq"
 )
 
 func main() {
-	// Load configuration (simplified for this example)
+	// Load configuration
 	cfg := config.Load()
+
+	// Enable debug mode if DEBUG environment variable is set
+	debugMode := os.Getenv("DEBUG") == "true"
+	if debugMode {
+		log.Println("Debug mode enabled")
+	}
+
+	// Log configuration for debugging
+	if debugMode {
+		log.Printf("Loaded configuration: %+v", cfg)
+	}
 
 	// Initialize the database
 	db, err := sql.Open("postgres", cfg.DatabaseURL)
@@ -32,16 +46,18 @@ func main() {
 	}
 	log.Println("Successfully connected to the database")
 
-	// Initialize the API router (simplified for this example)
-	router := http.NewServeMux()
-	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Hello, World!"))
-	})
+	// Initialize repositories
+	adRepo := repository.NewAdRepository(db)
+
+	// Initialize services
+	adService := services.NewAdService(adRepo)
+
+	// Initialize the API router
+	router := api.NewRouter(adService)
 
 	// Create HTTP server with timeouts
 	server := &http.Server{
-		Addr:         ":" + strconv.Itoa(cfg.HTTPPort),
+		Addr:         ":" + strconv.Itoa(cfg.HTTPPort), // Convert HTTPPort to string
 		Handler:      router,
 		ReadTimeout:  cfg.ReadTimeout,
 		WriteTimeout: cfg.WriteTimeout,
