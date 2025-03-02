@@ -5,6 +5,7 @@ import (
 	"ad-tracking-system/internal/config"
 	"ad-tracking-system/internal/domain/services"
 	"ad-tracking-system/internal/repository"
+	"ad-tracking-system/pkg/kafka"
 	"context"
 	"database/sql"
 	"log"
@@ -52,6 +53,14 @@ func main() {
 	// Initialize services
 	adService := services.NewAdService(adRepo)
 
+	// Initialize Kafka producer
+	kafkaProducer, err := kafka.NewProducer(cfg.KafkaBrokers, cfg.KafkaTopic)
+	if err != nil {
+		log.Fatalf("Failed to create Kafka producer: %v", err)
+	}
+	defer kafkaProducer.Close()
+	log.Println("Kafka producer initialized")
+
 	// Initialize the API router
 	router := api.NewRouter(adService)
 
@@ -86,6 +95,12 @@ func main() {
 		log.Fatalf("HTTP server shutdown error: %v", err)
 	}
 	log.Println("HTTP server stopped")
+
+	// Close Kafka producer
+	if err := kafkaProducer.Close(); err != nil {
+		log.Fatalf("Kafka producer shutdown error: %v", err)
+	}
+	log.Println("Kafka producer stopped")
 
 	// Close database connection
 	if err := db.Close(); err != nil {
