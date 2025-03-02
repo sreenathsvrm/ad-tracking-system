@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-redis/redis/v8"
 	_ "github.com/lib/pq"
 )
 
@@ -47,11 +48,25 @@ func main() {
 	}
 	log.Println("Successfully connected to the database")
 
+	// Initialize Redis
+	redisClient := redis.NewClient(&redis.Options{
+		Addr: cfg.RedisURL,
+	})
+
+	// Test Redis connection
+	if _, err := redisClient.Ping(context.Background()).Result(); err != nil {
+		log.Fatalf("Failed to connect to Redis: %v", err)
+	}
+	log.Println("Successfully connected to Redis")
+
 	// Initialize repositories
 	adRepo := repository.NewAdRepository(db)
+	clickRepo := repository.NewClickRepository(db)
+	analyticsRepo := repository.NewAnalyticsRepository(redisClient)
 
 	// Initialize services
 	adService := services.NewAdService(adRepo)
+	clickService := services.NewClickService(clickRepo, analyticsRepo)
 
 	// Initialize Kafka producer
 	kafkaProducer, err := kafka.NewProducer(cfg.KafkaBrokers, cfg.KafkaTopic)
@@ -62,7 +77,7 @@ func main() {
 	log.Println("Kafka producer initialized")
 
 	// Initialize the API router
-	router := api.NewRouter(adService)
+	router := api.NewRouter(adService, clickService)
 
 	// Create HTTP server with timeouts
 	server := &http.Server{
@@ -101,6 +116,12 @@ func main() {
 		log.Fatalf("Kafka producer shutdown error: %v", err)
 	}
 	log.Println("Kafka producer stopped")
+
+	// Close Redis connection
+	if err := redisClient.Close(); err != nil {
+		log.Fatalf("Redis shutdown error: %v", err)
+	}
+	log.Println("Redis connection closed")
 
 	// Close database connection
 	if err := db.Close(); err != nil {
