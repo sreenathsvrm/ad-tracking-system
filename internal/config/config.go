@@ -41,8 +41,8 @@ func Load() *Config {
 		RedisURL:     getEnv("REDIS_URL", defaultRedisURL),
 		DatabaseURL:  getEnv("DATABASE_URL", defaultDatabaseURL),
 		MetricsPort:  getEnvAsInt("METRICS_PORT", defaultMetricsPort),
-		ReadTimeout:  getEnvAsDuration("READ_TIMEOUT", defaultReadTimeout),
-		WriteTimeout: getEnvAsDuration("WRITE_TIMEOUT", defaultWriteTimeout),
+		ReadTimeout:  getEnvAsDuration("READ_TIMEOUT", defaultReadTimeout),   
+		WriteTimeout: getEnvAsDuration("WRITE_TIMEOUT", defaultWriteTimeout), 
 	}
 
 	// Validate critical configurations
