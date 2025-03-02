@@ -1,10 +1,11 @@
-FROM golang:1.20-alpine
+FROM golang:1.22-alpine
 
 WORKDIR /app
 
-COPY . .
-
+COPY go.mod go.sum ./
 RUN go mod download
+
+COPY . .
 
 RUN go build -o ad-service ./cmd/ad-service
 
