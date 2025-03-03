@@ -19,6 +19,7 @@ func RecordClick(c *gin.Context, clickService *services.ClickService) {
 
 	// Set the timestamp to the current time
 	click.Timestamp = time.Now()
+	click.IP = c.ClientIP()
 
 	// Record the click event
 	if err := clickService.RecordClick(click); err != nil {

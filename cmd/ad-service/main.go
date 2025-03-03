@@ -8,11 +8,11 @@ import (
 	"ad-tracking-system/pkg/kafka"
 	"context"
 	"database/sql"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
-	"strconv" // Add this import
+	"strconv"
 	"syscall"
 	"time"
 
@@ -26,27 +26,35 @@ func main() {
 
 	// Enable debug mode if DEBUG environment variable is set
 	debugMode := os.Getenv("DEBUG") == "true"
+
+	// Initialize structured logging
+	handler := slog.NewJSONHandler(os.Stdout, nil)
+	logger := slog.New(handler)
+	slog.SetDefault(logger)
+
 	if debugMode {
-		log.Println("Debug mode enabled")
+		logger.Info("Debug mode enabled")
 	}
 
 	// Log configuration for debugging
 	if debugMode {
-		log.Printf("Loaded configuration: %+v", cfg)
+		logger.Info("Loaded configuration", "config", cfg)
 	}
 
 	// Initialize the database
 	db, err := sql.Open("postgres", cfg.DatabaseURL)
 	if err != nil {
-		log.Fatalf("Failed to connect to the database: %v", err)
+		logger.Error("Failed to connect to the database", "error", err)
+		os.Exit(1)
 	}
 	defer db.Close()
 
 	// Test database connection
 	if err := db.Ping(); err != nil {
-		log.Fatalf("Failed to ping the database: %v", err)
+		logger.Error("Failed to ping the database", "error", err)
+		os.Exit(1)
 	}
-	log.Println("Successfully connected to the database")
+	logger.Info("Successfully connected to the database")
 
 	// Initialize Redis
 	redisClient := redis.NewClient(&redis.Options{
@@ -55,9 +63,10 @@ func main() {
 
 	// Test Redis connection
 	if _, err := redisClient.Ping(context.Background()).Result(); err != nil {
-		log.Fatalf("Failed to connect to Redis: %v", err)
+		logger.Error("Failed to connect to Redis", "error", err)
+		os.Exit(1)
 	}
-	log.Println("Successfully connected to Redis")
+	logger.Info("Successfully connected to Redis")
 
 	// Initialize repositories
 	adRepo := repository.NewAdRepository(db)
@@ -71,10 +80,11 @@ func main() {
 	// Initialize Kafka producer
 	kafkaProducer, err := kafka.NewProducer(cfg.KafkaBrokers, cfg.KafkaTopic)
 	if err != nil {
-		log.Fatalf("Failed to create Kafka producer: %v", err)
+		logger.Error("Failed to create Kafka producer", "error", err)
+		os.Exit(1)
 	}
 	defer kafkaProducer.Close()
-	log.Println("Kafka producer initialized")
+	logger.Info("Kafka producer initialized")
 
 	// Initialize the API router
 	router := api.NewRouter(adService, clickService)
@@ -89,9 +99,10 @@ func main() {
 
 	// Start the HTTP server in a goroutine
 	go func() {
-		log.Printf("Starting HTTP server on port %d", cfg.HTTPPort)
+		logger.Info("Starting HTTP server", "port", cfg.HTTPPort)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("HTTP server error: %v", err)
+			logger.Error("HTTP server error", "error", err)
+			os.Exit(1)
 		}
 	}()
 
@@ -99,7 +110,7 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	log.Println("Shutting down server...")
+	logger.Info("Shutting down server...")
 
 	// Create a context with a timeout for shutdown
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -107,27 +118,27 @@ func main() {
 
 	// Shutdown the HTTP server
 	if err := server.Shutdown(ctx); err != nil {
-		log.Fatalf("HTTP server shutdown error: %v", err)
+		logger.Error("HTTP server shutdown error", "error", err)
 	}
-	log.Println("HTTP server stopped")
+	logger.Info("HTTP server stopped")
 
 	// Close Kafka producer
 	if err := kafkaProducer.Close(); err != nil {
-		log.Fatalf("Kafka producer shutdown error: %v", err)
+		logger.Error("Kafka producer shutdown error", "error", err)
 	}
-	log.Println("Kafka producer stopped")
+	logger.Info("Kafka producer stopped")
 
 	// Close Redis connection
 	if err := redisClient.Close(); err != nil {
-		log.Fatalf("Redis shutdown error: %v", err)
+		logger.Error("Redis shutdown error", "error", err)
 	}
-	log.Println("Redis connection closed")
+	logger.Info("Redis connection closed")
 
 	// Close database connection
 	if err := db.Close(); err != nil {
-		log.Fatalf("Database shutdown error: %v", err)
+		logger.Error("Database shutdown error", "error", err)
 	}
-	log.Println("Database connection closed")
+	logger.Info("Database connection closed")
 
-	log.Println("Server shutdown complete")
+	logger.Info("Server shutdown complete")
 }

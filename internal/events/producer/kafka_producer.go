@@ -2,18 +2,20 @@ package producer
 
 import (
 	"ad-tracking-system/internal/domain/models"
+	"ad-tracking-system/internal/utils/circuitbreaker"
 	"encoding/json"
+	"log"
 
 	"github.com/IBM/sarama"
+	"github.com/sony/gobreaker"
 )
 
-// KafkaProducer represents a Kafka producer for ad click events
 type KafkaProducer struct {
 	producer sarama.SyncProducer
 	topic    string
+	cb       *gobreaker.CircuitBreaker
 }
 
-// NewKafkaProducer creates a new Kafka producer
 func NewKafkaProducer(brokers []string, topic string) (*KafkaProducer, error) {
 	config := sarama.NewConfig()
 	config.Producer.RequiredAcks = sarama.WaitForAll
@@ -28,26 +30,34 @@ func NewKafkaProducer(brokers []string, topic string) (*KafkaProducer, error) {
 	return &KafkaProducer{
 		producer: producer,
 		topic:    topic,
+		cb:       circuitbreaker.NewCircuitBreaker("kafka-producer"), // Initialize circuit breaker
 	}, nil
 }
 
-// PublishClickEvent publishes a click event to Kafka
 func (kp *KafkaProducer) PublishClickEvent(click models.ClickEvent) error {
-	message, err := json.Marshal(click)
+	// Wrap Kafka operation with circuit breaker
+	_, err := kp.cb.Execute(func() (interface{}, error) {
+		message, err := json.Marshal(click)
+		if err != nil {
+			return nil, err
+		}
+
+		msg := &sarama.ProducerMessage{
+			Topic: kp.topic,
+			Value: sarama.ByteEncoder(message),
+		}
+
+		_, _, err = kp.producer.SendMessage(msg)
+		return nil, err
+	})
 	if err != nil {
+		log.Printf("Failed to publish click event (circuit breaker): %v", err)
 		return err
 	}
 
-	msg := &sarama.ProducerMessage{
-		Topic: kp.topic,
-		Value: sarama.ByteEncoder(message),
-	}
-
-	_, _, err = kp.producer.SendMessage(msg)
-	return err
+	return nil
 }
 
-// Close shuts down the Kafka producer
 func (kp *KafkaProducer) Close() error {
 	return kp.producer.Close()
 }

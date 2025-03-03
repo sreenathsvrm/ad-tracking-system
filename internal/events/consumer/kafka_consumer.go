@@ -1,20 +1,21 @@
 package consumer
 
 import (
+	"ad-tracking-system/internal/utils/circuitbreaker"
 	"log"
 	"sync"
 
 	"github.com/IBM/sarama"
+	"github.com/sony/gobreaker"
 )
 
-// KafkaConsumer represents a Kafka consumer for ad click events
 type KafkaConsumer struct {
 	consumer sarama.Consumer
 	handler  func(message *sarama.ConsumerMessage)
 	wg       sync.WaitGroup
+	cb       *gobreaker.CircuitBreaker
 }
 
-// NewKafkaConsumer creates a new Kafka consumer
 func NewKafkaConsumer(brokers []string, handler func(message *sarama.ConsumerMessage)) (*KafkaConsumer, error) {
 	config := sarama.NewConfig()
 	config.Consumer.Return.Errors = true
@@ -27,10 +28,10 @@ func NewKafkaConsumer(brokers []string, handler func(message *sarama.ConsumerMes
 	return &KafkaConsumer{
 		consumer: consumer,
 		handler:  handler,
+		cb:       circuitbreaker.NewCircuitBreaker("kafka-consumer"), // Initialize circuit breaker
 	}, nil
 }
 
-// Consume starts consuming messages from the specified topic
 func (kc *KafkaConsumer) Consume(topic string) {
 	partitions, err := kc.consumer.Partitions(topic)
 	if err != nil {
@@ -46,7 +47,6 @@ func (kc *KafkaConsumer) Consume(topic string) {
 	log.Printf("Started consuming messages from topic: %s", topic)
 }
 
-// consumePartition consumes messages from a specific partition
 func (kc *KafkaConsumer) consumePartition(topic string, partition int32) {
 	defer kc.wg.Done()
 
@@ -58,11 +58,17 @@ func (kc *KafkaConsumer) consumePartition(topic string, partition int32) {
 	defer partitionConsumer.Close()
 
 	for msg := range partitionConsumer.Messages() {
-		kc.handler(msg)
+		// Wrap message handling with circuit breaker
+		_, err := kc.cb.Execute(func() (interface{}, error) {
+			kc.handler(msg)
+			return nil, nil
+		})
+		if err != nil {
+			log.Printf("Failed to process message (circuit breaker): %v", err)
+		}
 	}
 }
 
-// Close stops the consumer and releases resources
 func (kc *KafkaConsumer) Close() error {
 	kc.wg.Wait()
 	return kc.consumer.Close()

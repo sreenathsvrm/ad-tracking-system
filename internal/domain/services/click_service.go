@@ -3,46 +3,63 @@ package services
 import (
 	"ad-tracking-system/internal/domain/models"
 	"ad-tracking-system/internal/repository"
+	"ad-tracking-system/internal/utils/circuitbreaker"
 	"log"
+
+	"github.com/sony/gobreaker"
 )
 
-// ClickService provides business logic for click-related operations
 type ClickService struct {
 	clickRepo     *repository.ClickRepository
 	analyticsRepo *repository.AnalyticsRepository
+	cb            *gobreaker.CircuitBreaker
 }
 
-// NewClickService creates a new ClickService
 func NewClickService(clickRepo *repository.ClickRepository, analyticsRepo *repository.AnalyticsRepository) *ClickService {
 	return &ClickService{
 		clickRepo:     clickRepo,
 		analyticsRepo: analyticsRepo,
+		cb:            circuitbreaker.NewCircuitBreaker("click-service"), // Initialize circuit breaker
 	}
 }
 
-// RecordClick records a click event and updates analytics
 func (s *ClickService) RecordClick(click models.ClickEvent) error {
-	// Save the click event to the database
-	if err := s.clickRepo.Save(click); err != nil {
-		log.Printf("Failed to save click event: %v", err)
+	// Wrap database operation with circuit breaker
+	_, err := s.cb.Execute(func() (interface{}, error) {
+		if err := s.clickRepo.Save(click); err != nil {
+			return nil, err
+		}
+		return nil, nil
+	})
+	if err != nil {
+		log.Printf("Failed to record click (circuit breaker): %v", err)
 		return err
 	}
 
-	// Update analytics (e.g., increment click count in Redis)
-	if err := s.analyticsRepo.IncrementClickCount(click.AdID); err != nil {
-		log.Printf("Failed to update analytics: %v", err)
+	// Wrap Redis operation with circuit breaker
+	_, err = s.cb.Execute(func() (interface{}, error) {
+		if err := s.analyticsRepo.IncrementClickCount(click.AdID); err != nil {
+			return nil, err
+		}
+		return nil, nil
+	})
+	if err != nil {
+		log.Printf("Failed to update analytics (circuit breaker): %v", err)
 		return err
 	}
 
 	return nil
 }
 
-// GetClickCount returns the total click count for a specific ad
 func (s *ClickService) GetClickCount(adID string) (int64, error) {
-	count, err := s.analyticsRepo.GetClickCount(adID)
+	// Wrap Redis operation with circuit breaker
+	result, err := s.cb.Execute(func() (interface{}, error) {
+		return s.analyticsRepo.GetClickCount(adID)
+	})
 	if err != nil {
-		log.Printf("Failed to get click count: %v", err)
+		log.Printf("Failed to get click count (circuit breaker): %v", err)
 		return 0, err
 	}
-	return count, nil
+
+	return result.(int64), nil
 }
