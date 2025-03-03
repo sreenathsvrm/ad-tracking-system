@@ -46,7 +46,7 @@ Local Setup
 1. Clone the Repository
 bash
 Copy
-git clone https://github.com/your-username/ad-tracking-system.git
+git clone https://github.com/sreenathsvrm/ad-tracking-system.git
 cd ad-tracking-system
 2. Set Up Environment Variables
 Create a .env file in the root directory and add the following:
