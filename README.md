@@ -1,248 +1,161 @@
-Ad Tracking System
-A scalable and resilient Go backend for managing and tracking video advertisements. This system provides APIs to manage ads, track user clicks, and fetch real-time analytics.
+# Ad Tracking System
 
-Features
-API Endpoints: Manage ads, track clicks, and fetch analytics.
+A scalable and resilient Go backend for managing and tracking video advertisements. Provides APIs to manage ads, track clicks, and fetch real-time analytics.
 
-Scalability: Handles high traffic and surges efficiently.
+## Features
 
-Resilience: No data loss with circuit breakers and retries.
+* **API Endpoints:** Manage ads, track clicks, and fetch analytics.
+* **Scalability:** Handles high traffic efficiently.
+* **Resilience:** No data loss with circuit breakers and retries.
+* **Real-time Analytics:** Powered by Redis.
+* **Docker Support:** Included in the project.
+* **Kubernetes:** Basic configuration provided (not production-ready).
 
-Real-time Analytics: Powered by Redis for fast queries.
+## Prerequisites
 
-Docker Support: Easy containerization.
+* Go (v1.22+)
+* Docker and Docker Compose
+* Postman or any API testing tool
+* Git
 
-Kubernetes Deployment: Ready for production.
+## Quick Start
 
-Table of Contents
-Prerequisites
+1.  **Clone the Repository**
 
-Local Setup
+    ```bash
+    git clone [https://github.com/sreenathsvrm/ad-tracking-system.git](https://github.com/sreenathsvrm/ad-tracking-system.git)
+    cd ad-tracking-system
+    ```
 
-Running with Docker
+2.  **Set Up Environment**
 
-Kubernetes Deployment
+    * Create a `.env` file:
 
-API Endpoints
+        ```ini
+        HTTP_PORT=8080
+        KAFKA_BROKERS=localhost:9092
+        KAFKA_TOPIC=ad-clicks
+        REDIS_URL=localhost:6379
+        DATABASE_URL=postgres://postgres:password@localhost:5432/ad_tracking?sslmode=disable
+        METRICS_PORT=2112
+        READ_TIMEOUT=10s
+        WRITE_TIMEOUT=10s
+        ```
 
-Testing the APIs
+    * Start the services using Docker Compose:
 
-Monitoring and Logging
+        ```bash
+        docker-compose up -d
+        ```
 
-Prerequisites
-Before you begin, ensure you have the following installed:
+    * The API will be available at `http://localhost:8080`.
 
-Go (v1.22 or higher)
+## API Endpoints
 
-Docker and Docker Compose
+1.  **Fetch All Ads**
 
-Kubectl (for Kubernetes deployment)
+    * `GET /ads`
+    * **Description:** Returns a list of ads with basic metadata (e.g., ID, image URL, target URL).
+    * **Response:**
 
-Postman or any API testing tool
+        ```json
+        [
+          {
+            "id": "1",
+            "image_url": "[http://example.com/image1.jpg](http://example.com/image1.jpg)",
+            "target_url": "[http://example.com/target1](http://example.com/target1)"
+          }
+        ]
+        ```
 
-Git
+2.  **Record a Click**
 
-Local Setup
-1. Clone the Repository
-bash
-Copy
-git clone https://github.com/sreenathsvrm/ad-tracking-system.git
-cd ad-tracking-system
-2. Set Up Environment Variables
-Create a .env file in the root directory and add the following:
+    * `POST /ads/click`
+    * **Request Body:**
 
-env
-Copy
-HTTP_PORT=8080
-KAFKA_BROKERS=localhost:9092
-KAFKA_TOPIC=ad-clicks
-REDIS_URL=localhost:6379
-DATABASE_URL=postgres://postgres:password@localhost:5432/ad_tracking?sslmode=disable
-METRICS_PORT=2112
-READ_TIMEOUT=10s
-WRITE_TIMEOUT=10s
-3. Install Dependencies
-bash
-Copy
-go mod download
-4. Start Dependencies
-Run the following services using Docker Compose:
+        ```json
+        {
+          "ad_id": "1",
+          "playback_time": 30
+        }
+        ```
 
-bash
-Copy
-docker-compose up -d
-This will start:
+    * **Response:**
 
-PostgreSQL (for ad and click data)
+        ```json
+        {
+          "status": "Click recorded"
+        }
+        ```
 
-Redis (for real-time analytics)
+3.  **Fetch Analytics**
 
-Kafka (for click event processing)
+    * `GET /ads/analytics?ad_id=1`
+    * **Response:**
 
-5. Run the Application
-bash
-Copy
-go run cmd/ad-service/main.go
-The application will start on http://localhost:8080.
+        ```json
+        {
+          "ad_id": "1",
+          "click_count": 10
+        }
+        ```
 
-Running with Docker
-1. Build the Docker Image
-bash
-Copy
-docker build -t ad-service .
-2. Run the Application with Docker Compose
-Update the docker-compose.yml file to include the ad-service:
+## Testing the APIs Using cURL
 
-yaml
-Copy
-ad-service:
-  image: ad-service
-  ports:
-    - "8080:8080"
-  environment:
-    HTTP_PORT: ${HTTP_PORT}
-    KAFKA_BROKERS: ${KAFKA_BROKERS}
-    KAFKA_TOPIC: ${KAFKA_TOPIC}
-    REDIS_URL: ${REDIS_URL}
-    DATABASE_URL: ${DATABASE_URL}
-    METRICS_PORT: ${METRICS_PORT}
-    READ_TIMEOUT: ${READ_TIMEOUT}
-    WRITE_TIMEOUT: ${WRITE_TIMEOUT}
-  depends_on:
-    kafka:
-      condition: service_healthy
-    redis:
-      condition: service_healthy
-    postgres:
-      condition: service_healthy
-Start all services:
+* **Fetch all ads:**
 
-bash
-Copy
-docker-compose up -d
-Kubernetes Deployment
-1. Set Up Kubernetes Cluster
-Ensure you have a Kubernetes cluster running (e.g., Minikube, GKE, EKS).
+    ```bash
+    curl -X GET http://localhost:8080/ads
+    ```
 
-2. Apply Kubernetes Manifests
-Deploy the application using the provided Kubernetes manifests:
+* **Record a click:**
 
-bash
-Copy
-kubectl apply -f kubernetes/
-This will deploy:
+    ```bash
+    curl -X POST http://localhost:8080/ads/click -d '{"ad_id": "1", "playback_time": 30}'
+    ```
 
-PostgreSQL, Redis, and Kafka as stateful services.
+* **Fetch analytics:**
 
-Ad Service as a deployment with a load balancer.
+    ```bash
+    curl -X GET http://localhost:8080/ads/analytics?ad_id=1
+    ```
 
-3. Access the Application
-Get the external IP of the ad-service:
+## Monitoring
 
-bash
-Copy
-kubectl get svc ad-service
-Access the API at http://<EXTERNAL_IP>:80.
+* **Prometheus Metrics:** `http://localhost:2112/metrics`
+* **Grafana:** Set up dashboards to visualize metrics.
 
-API Endpoints
-1. Fetch All Ads
-Method: GET
+## Troubleshooting
 
-URL: /ads
+* **Database Issues:**
+    * **Ensure that the database has dummy data:**
+        * Assuming your database has the following `ads` table:
 
-Response:
+            ```sql
+            CREATE TABLE ads (
+                id VARCHAR(36) PRIMARY KEY,
+                image_url TEXT NOT NULL,
+                target_url TEXT NOT NULL
+            );
+            ```
 
-json
-Copy
-[
-  {
-    "id": "1",
-    "image_url": "http://example.com/image1.jpg",
-    "target_url": "http://example.com/target1"
-  }
-]
-2. Record a Click
-Method: POST
+        * Insert dummy data using SQL:
 
-URL: /ads/click
+            ```sql
+            INSERT INTO ads (id, image_url, target_url) VALUES
+            ('1', '[http://example.com/image1.jpg](http://example.com/image1.jpg)', '[http://example.com/target1](http://example.com/target1)'),
+            ('2', '[http://example.com/image2.jpg](https://www.google.com/search?q=http://example.com/image2.jpg)', '[http://example.com/target2](https://www.google.com/search?q=http://example.com/target2)'),
+            ('3', '[http://example.com/image3.jpg](https://www.google.com/search?q=http://example.com/image3.jpg)', '[http://example.com/target3](https://www.google.com/search?q=http://example.com/target3)');
+            ```
 
-Request Body:
+        * Ensure PostgreSQL is running and the connection string is correct.
+* **Kafka Errors:** Check if Kafka brokers are reachable.
+* **Redis Errors:** Verify Redis is running.
 
-json
-Copy
-{
-  "ad_id": "1",
-  "playback_time": 30
-}
-Response:
+## Contributing
 
-json
-Copy
-{
-  "status": "Click recorded"
-}
-3. Fetch Analytics
-Method: GET
+* Open issues or submit pull requests for improvements.
 
-URL: /ads/analytics?ad_id=1
+## License
 
-Response:
-
-json
-Copy
-{
-  "ad_id": "1",
-  "click_count": 10
-}
-Testing the APIs
-Using Postman
-Import the provided Postman collection (available in the repository).
-
-Set the base URL to http://localhost:8080 (or the Kubernetes external IP).
-
-Test the endpoints:
-
-Fetch all ads.
-
-Record a click.
-
-Fetch analytics.
-
-Using cURL
-Fetch all ads:
-
-bash
-Copy
-curl -X GET http://localhost:8080/ads
-Record a click:
-
-bash
-Copy
-curl -X POST http://localhost:8080/ads/click -d '{"ad_id": "1", "playback_time": 30}'
-Fetch analytics:
-
-bash
-Copy
-curl -X GET http://localhost:8080/ads/analytics?ad_id=1
-Monitoring and Logging
-1. Prometheus Metrics
-Access metrics at http://localhost:2112/metrics.
-
-2. Grafana Dashboards
-Set up Grafana to visualize Prometheus metrics.
-
-3. Structured Logging
-Logs are output in JSON format for easy parsing.
-
-Troubleshooting
-Database Connection Issues: Ensure PostgreSQL is running and the connection string is correct.
-
-Kafka Errors: Check if Kafka brokers are reachable.
-
-Redis Errors: Verify Redis is running and the URL is correct.
-
-Contributing
-Feel free to open issues or submit pull requests for improvements.
-
-License
-This project is licensed under the MIT License. See the LICENSE file for details
+* MIT License. See `LICENSE`.
