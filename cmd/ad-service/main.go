@@ -56,6 +56,28 @@ func main() {
 	}
 	logger.Info("Successfully connected to the database")
 
+	// Initialize repositories
+	adRepo := repository.NewAdRepository(db)
+
+	// Check if the ads table is empty
+	count, err := adRepo.CountAds()
+	if err != nil {
+		logger.Error("Failed to count ads", "error", err)
+		os.Exit(1)
+	}
+
+	// Seed the database only if it's empty
+	if count == 0 {
+		logger.Info("Seeding database with dummy ads...")
+		if err := adRepo.Seed(); err != nil {
+			logger.Error("Failed to seed database", "error", err)
+			os.Exit(1)
+		}
+		logger.Info("Database seeded with 10 dummy ads")
+	} else {
+		logger.Info("Database already contains data, skipping seeding")
+	}
+
 	// Initialize Redis
 	redisClient := redis.NewClient(&redis.Options{
 		Addr: cfg.RedisURL,
@@ -69,7 +91,6 @@ func main() {
 	logger.Info("Successfully connected to Redis")
 
 	// Initialize repositories
-	adRepo := repository.NewAdRepository(db)
 	clickRepo := repository.NewClickRepository(db)
 	analyticsRepo := repository.NewAnalyticsRepository(redisClient)
 

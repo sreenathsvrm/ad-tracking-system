@@ -16,6 +16,16 @@ func GetAnalytics(analyticsService *services.ClickService) gin.HandlerFunc {
 			return
 		}
 
+		// Check if the adID exists
+		adExists, err := analyticsService.AdExists(adID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check if ad exists"})
+			return
+		}
+		if !adExists {
+			c.JSON(http.StatusNotFound, gin.H{"error": "ad not found"})
+			return
+		}
 		// Get the click count for the ad
 		count, err := analyticsService.GetClickCount(adID)
 		if err != nil {

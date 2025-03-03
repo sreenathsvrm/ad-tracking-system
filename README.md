@@ -138,17 +138,8 @@ A scalable and resilient Go backend for managing and tracking video advertisemen
                 target_url TEXT NOT NULL
             );
             ```
-
-        * Insert dummy data using SQL:
-
-            ```sql
-            INSERT INTO ads (id, image_url, target_url) VALUES
-            ('1', '[http://example.com/image1.jpg](http://example.com/image1.jpg)', '[http://example.com/target1](http://example.com/target1)'),
-            ('2', '[http://example.com/image2.jpg](https://www.google.com/search?q=http://example.com/image2.jpg)', '[http://example.com/target2](https://www.google.com/search?q=http://example.com/target2)'),
-            ('3', '[http://example.com/image3.jpg](https://www.google.com/search?q=http://example.com/image3.jpg)', '[http://example.com/target3](https://www.google.com/search?q=http://example.com/target3)');
-            ```
-
-        * Ensure PostgreSQL is running and the connection string is correct.
+ 
+  * Ensure PostgreSQL is running and the connection string is correct.
 * **Kafka Errors:** Check if Kafka brokers are reachable.
 * **Redis Errors:** Verify Redis is running.
 
