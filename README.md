@@ -156,6 +156,5 @@ A scalable and resilient Go backend for managing and tracking video advertisemen
 
 * Open issues or submit pull requests for improvements.
 
-## License
-
-* MIT License. See `LICENSE`.
+License
+This project is licensed under the MIT License. See the LICENSE file for details
